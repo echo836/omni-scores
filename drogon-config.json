@@ -10,6 +10,6 @@
             "network_id": 2
         }
     },
-    "deployJar": false,
+    "deployJar": true,
     "keystore": ".keystore.json"
 }

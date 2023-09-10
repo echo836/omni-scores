@@ -1,4 +1,4 @@
-package io.contractdeployer.generics.irc31.utils;
+package com.omni.score.utils;
 
 import score.ArrayDB;
 

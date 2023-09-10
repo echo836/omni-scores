@@ -3,7 +3,7 @@ package com.omni.score;
 import score.*;
 
 import java.math.BigInteger;
-
+import com.omni.score.utils.IntSet;
 import static com.omni.score.Constant.*;
 import static score.Context.newVarDB;
 import static score.Context.newArrayDB;
@@ -18,6 +18,7 @@ public class Vars {
     static final BranchDB<BigInteger, DictDB<Address, BigInteger>> balances = Context.newBranchDB(BALANCES, BigInteger.class);
     static final BranchDB<Address, DictDB<Address, Boolean>> operatorApproval = Context.newBranchDB(APPROVAL, Boolean.class);
     static final DictDB<BigInteger, String> tokenURIs = Context.newDictDB(TOKEN_URI, String.class);
+    static final DictDB<Address, IntSet> userBalance = Context.newDictDB(USER_BALANCE, IntSet.class);
     static final VarDB<Address> admin = newVarDB(ADMIN, Address.class);
     
     // ICON ONS logic

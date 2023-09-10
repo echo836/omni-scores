@@ -18,7 +18,7 @@ import score.annotation.Payable;
 public class xCalls {
 
     @External(readonly=true)
-    public Address btpAddress() {
+    public String btpAddress() {
         return btpAddress.get();
     }
 
@@ -65,7 +65,8 @@ public class xCalls {
 
     private BigInteger _sendCallMessage(BigInteger value, String to, byte[] data, byte[] rollback) {
         try {
-            return Context.call(BigInteger.class, value, extractAddressFromBtpAddress(btpAddress()), "sendCallMessage", to, data, rollback);
+            Context.call(value, extractAddressFromBtpAddress(btpAddress()), "sendCallMessage", to, data, rollback);
+            return BigInteger.ONE;
         } catch (UserRevertedException e) {
             // propagate the error code to the caller
             Context.revert(e.getCode(), "UserReverted");

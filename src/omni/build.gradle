@@ -20,6 +20,41 @@ optimizedJar {
     }
 }
 
+deployJar {
+    endpoints {
+        berlin {
+            uri = 'https://berlin.net.solidwallet.io/api/v3'
+            nid = 0x7
+        }
+        sejong {
+            uri = 'https://sejong.net.solidwallet.io/api/v3'
+            nid = 0x53
+        }
+        mainnet {
+            uri = 'https://ctz.solidwallet.io/api/v3'
+            nid = 0x1
+        }
+        lisbon {
+            uri = 'https://lisbon.net.solidwallet.io/api/v3'
+            nid = 0x2
+        }
+    }
+    keystore = rootProject.hasProperty('keystoreName') ? "$keystoreName" : '../res/keystore_gochain'
+    password = rootProject.hasProperty('keystorePass') ? "$keystorePass" : 'gochain'
+    
+    parameters {
+        arg('_name','Omni Name Service')
+        arg('_symbol','OMNI')
+    }
+}
+
+optimizedJar {
+    mainClassName = 'com.omni.score.IRC31'
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
 subprojects {
     group 'com.omni.score'
     version '0.1'
@@ -77,9 +112,11 @@ subprojects {
                 uri = 'https://ctz.solidwallet.io/api/v3'
                 nid = 0x1
             }
+            lisbon {
+                uri = 'https://lisbon.net.solidwallet.io/api/v3'
+                nid = 0x2
+            }
         }
-        keystore = rootProject.hasProperty('keystoreName') ? "$keystoreName" : ''
-        password = rootProject.hasProperty('keystorePass') ? "$keystorePass" : ''
 
         parameters {
             arg('_name','MyIRC31')

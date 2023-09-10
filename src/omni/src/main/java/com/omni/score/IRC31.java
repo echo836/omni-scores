@@ -15,6 +15,8 @@ import score.annotation.Payable;
 
 import java.math.BigInteger;
 import java.util.List;
+import java.util.ArrayList;
+import com.omni.score.utils.IntSet;
 
 import static com.omni.score.Vars.*;
 import static com.omni.score.Constant.*;
@@ -52,16 +54,16 @@ public class IRC31 implements InterfaceIRC31 {
         return "btp://" + network + "/" + address;
     }
 
-    private String extractAddressFromBtpAddress(String btpAddress) {
-    int lastSlashIndex = btpAddress.lastIndexOf("/");
-    
-    if (lastSlashIndex != -1 && lastSlashIndex < btpAddress.length() - 1) {
-        return btpAddress.substring(lastSlashIndex + 1);
-    } else {
-        // Return an empty string or handle the case as needed
-        return "";
+    protected static Address extractAddressFromBtpAddress(String btpAddress) {
+        int lastSlashIndex = btpAddress.lastIndexOf("/");
+
+        if (lastSlashIndex != -1 && lastSlashIndex < btpAddress.length() - 1) {
+            return Address.fromString(btpAddress.substring(lastSlashIndex + 1));
+        } else {
+            // Return an empty string or handle the case as needed
+            return Address.fromString("hx0000000000000000000000000000000000000000");
+        }
     }
-}
 
     @External(readonly=true)
     public String name() {
@@ -110,6 +112,22 @@ public class IRC31 implements InterfaceIRC31 {
     }
 
     @External(readonly = true)
+    public List allTokens(Address _address) {
+        var tokens = userBalance.get(_address);
+        BigInteger[] tokenList = new BigInteger[tokens.length()];
+        for (int i = 0; i < tokens.length(); i++) {
+            tokenList[i] = tokens.at(i);
+        }
+        return List.of(tokenList);
+    }
+
+    @External(readonly=true)
+    public BigInteger tokenOfOwnerByIndex(Address _owner, int _index) {
+        var tokens = userBalance.get(_owner);
+        return (tokens != null) ? tokens.at(_index) : BigInteger.ZERO;
+    }
+
+    @External(readonly = true)
     public String getMainName(String _btpAddress) {
         return mainName.get(_btpAddress);
     }
@@ -134,6 +152,25 @@ public class IRC31 implements InterfaceIRC31 {
     @External(readonly=true)
     public BigInteger getExpiration(BigInteger _id) {
         return expirations.getOrDefault(_id, BigInteger.ZERO);
+    }
+
+    private void _addTokenTo(BigInteger tokenId, Address to) {
+        var tokens = userBalance.get(to);
+        if (tokens == null) {
+            tokens = new IntSet(to.toString());
+            userBalance.set(to, tokens);
+        }
+        tokens.add(tokenId);
+        
+    }
+
+    private void _removeTokenFrom(BigInteger tokenId, Address from) {
+        var tokens = userBalance.get(from);
+        Context.require(tokens != null);
+        tokens.remove(tokenId);
+        if (tokens.length() == 0) {
+            userBalance.set(from, null);
+        }
     }
 
     @External(readonly=true)
@@ -170,9 +207,41 @@ public class IRC31 implements InterfaceIRC31 {
         return balances;
     }
 
+    public static String unescapeString(String input) {
+        StringBuilder output = new StringBuilder();
+        boolean escapeMode = false;
+
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+
+            if (escapeMode) {
+                switch (c) {
+                    case 'n':
+                        output.append('\n');
+                        break;
+                    case 't':
+                        output.append('\t');
+                        break;
+                    // Add more cases for other escape sequences as needed
+                    default:
+                        output.append(c);
+                }
+                escapeMode = false;
+            } else {
+                if (c == '\\') {
+                    escapeMode = true;
+                } else {
+                    output.append(c);
+                }
+            }
+        }
+
+        return output.toString();
+    }
+
     @External(readonly=true)
     public String tokenURI(BigInteger _tokenId) {
-        return tokenURIs.get(_tokenId);
+        return unescapeString(tokenURIs.get(_tokenId));
     }
 
     @External
@@ -185,11 +254,13 @@ public class IRC31 implements InterfaceIRC31 {
                 Message.Not.enoughBalance());
 
         // Transfer funds
+        _addTokenTo(_id, _to);
+        _removeTokenFrom(_id, _from);
         DictDB<Address, BigInteger> balance = balances.at(_id);
-        balance.set(_from, balanceOf(_from, _id).subtract(_value));
-        balance.set(_to, balanceOf(_to, _id).add(_value));
+        balance.set(_from, balanceOf(_from, _id).subtract(BigInteger.ONE));
+        balance.set(_to, balanceOf(_to, _id).add(BigInteger.ONE));
+        ownership.set(_id, caller);
 
-        ownership.set(_id, _to);
         String _name = nameId.get(_id);
         nameMap.set(_name, _to);
         // Emit event
@@ -222,8 +293,13 @@ public class IRC31 implements InterfaceIRC31 {
             // Transfer funds
             BigInteger balanceTo = balanceOf(_to, _id);
             DictDB<Address, BigInteger> balance = balances.at(_id);
-            balance.set(_from, balanceFrom.subtract(_value));
-            balance.set(_to, balanceTo.add(_value));
+            _addTokenTo(_id, _to);
+            _removeTokenFrom(_id, _from);
+            balance.set(_from, balanceOf(_from, _id).subtract(BigInteger.ONE));
+            balance.set(_to, balanceOf(_to, _id).add(BigInteger.ONE));
+            ownership.set(_id, _to);
+            String _name = nameId.get(_id);
+            nameMap.set(_name, _to);
         }
 
         // Emit event
@@ -249,6 +325,19 @@ public class IRC31 implements InterfaceIRC31 {
         return operatorApproval.at(_owner).getOrDefault(_operator, false);
     }
 
+    public static String replaceAllOccurrences(String input, String target, String replacement) {
+        StringBuilder result = new StringBuilder(input);
+        int targetLength = target.length();
+        int currentIndex = input.lastIndexOf(target);
+
+        while (currentIndex != -1) {
+            result.replace(currentIndex, currentIndex + targetLength, replacement);
+            currentIndex = input.lastIndexOf(target, currentIndex - 1);
+        }
+
+        return result.toString();
+    }
+
     public static String generateSvg(String _name){
         
         Long randomFactor = Context.getBlockHeight();
@@ -258,12 +347,10 @@ public class IRC31 implements InterfaceIRC31 {
         int colorIndex = (int) (randomFactor2 % colors.size());
 
         String base = templates.get(templateIndex);
-        List<String> selectedColors = colors.get(colorIndex);
+        String selectedColors = colors.get(colorIndex);
+        
+        base = replaceAllOccurrences(base, "{{color}}", selectedColors);
 
-        for (int i = 0; i < selectedColors.size(); i++) {
-            String colorVariable = "{{color" + (i + 1) + "}}";
-            base = base.replace(colorVariable, selectedColors.get(i));
-        }
         String modifiedSvg = base.replace("{{replace}}", _name);
 
         return modifiedSvg;
@@ -300,6 +387,12 @@ public class IRC31 implements InterfaceIRC31 {
         nameMap.set(_name, _owner);
         nameId.set(_id, _name);
         ownership.set(_id, _owner);
+        var tokens = userBalance.get(_owner);
+        if (tokens == null) {
+            tokens = new IntSet(_owner.toString());
+            userBalance.set(_owner, tokens);
+        }
+        tokens.add(_id);
         String iconId = supportedNetworks.get(0);
         crossChainBalance.set(_id, returnBtpAddress(iconId, _owner.toString()));
         nameCount.set(_id);
@@ -356,12 +449,12 @@ public class IRC31 implements InterfaceIRC31 {
         Address caller = Context.getCaller();
         expirations.set(_id, exp);
         
-
-        // Transfer logic
         DictDB<Address, BigInteger> balance = balances.at(_id);
+        // Transfer logic
+        _addTokenTo(_id, caller);
+        _removeTokenFrom(_id, pastOwner);
         balance.set(pastOwner, balanceOf(pastOwner, _id).subtract(BigInteger.ONE));
         balance.set(caller, balanceOf(caller, _id).add(BigInteger.ONE));
-
         ownership.set(_id, caller);
         nameMap.set(_name, caller);
         // Emit event
