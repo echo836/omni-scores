@@ -98,19 +98,33 @@ public class xCalls {
         return _id;
     }
 
+    private String sanitizeName(String _name) {
+        // Throw error if name contains space
+        if (_name.contains(" ")) {
+            Context.revert(10, "Space in name"); 
+        }
+        if (_name.length() > 18) {
+            Context.revert(11, "Name is too long"); 
+        }
+        // Convert name to lowercase
+        return _name.toLowerCase();
+    }
+
     private void _registerNameAndLock(BigInteger _id, String _owner, String _uri, String _name, BigInteger _years){
         _mintInternal(Context.getAddress(), _id, BigInteger.ONE, _uri);
         Long ts = Context.getBlockTimestamp();
         BigInteger now = BigInteger.valueOf(ts);
         BigInteger exp = now.add(_years.multiply(ONE_YEAR));
+        String sanitizedName = sanitizeName(_name);
         expirations.set(_id, exp);
-        nameMap.set(_name, Context.getAddress());
-        nameId.set(_id, _name);
+        nameMap.set(sanitizedName, Context.getAddress());
+        nameId.set(_id, sanitizedName);
+        
         ownership.set(_id, Context.getAddress());
         crossChainBalance.set(_id, _owner);
         nameCount.set(_id);
         TransferSingle(Context.getAddress(), ZERO_ADDRESS, Context.getAddress(), _id, BigInteger.ONE);
-        ExpirationSet(_id, _name, exp);
+        ExpirationSet(_id, sanitizedName, exp);
     }
 
     @External

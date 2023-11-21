@@ -33,10 +33,12 @@ deployJar {
         mainnet {
             uri = 'https://ctz.solidwallet.io/api/v3'
             nid = 0x1
+            to = 'cx3dd4adebb73eebcb8a7029c1a07b5a64be926ddf'
         }
         lisbon {
-            uri = 'https://lisbon.net.solidwallet.io/api/v3'
+            uri = 'https://api.lisbon.icon.community/api/v3'
             nid = 0x2
+            to = 'cx6ae0b3a53dc7ce1ca3dc0d6744c580406926a445'
         }
     }
     keystore = rootProject.hasProperty('keystoreName') ? "$keystoreName" : '../res/keystore_gochain'

@@ -259,7 +259,7 @@ public class IRC31 implements InterfaceIRC31 {
         DictDB<Address, BigInteger> balance = balances.at(_id);
         balance.set(_from, balanceOf(_from, _id).subtract(BigInteger.ONE));
         balance.set(_to, balanceOf(_to, _id).add(BigInteger.ONE));
-        ownership.set(_id, caller);
+        ownership.set(_id, _to);
 
         String _name = nameId.get(_id);
         nameMap.set(_name, _to);
@@ -377,6 +377,18 @@ public class IRC31 implements InterfaceIRC31 {
         _registerName(Context.getCaller(), uri, _name, _years);
     }
 
+    private String sanitizeName(String _name) {
+        // Throw error if name contains space
+        if (_name.contains(" ")) {
+            Context.revert(10, "Space in name"); 
+        }
+        if (_name.length() > 18) {
+            Context.revert(11, "Name is too long"); 
+        }
+        // Convert name to lowercase
+        return _name.toLowerCase();
+    }
+
     private void _registerName(Address _owner, String _uri, String _name, BigInteger _years){
         BigInteger _id = this.getNameCount().add(BigInteger.ONE);
         _mintInternal(_owner, _id, BigInteger.ONE, _uri);
@@ -384,8 +396,9 @@ public class IRC31 implements InterfaceIRC31 {
         BigInteger now = BigInteger.valueOf(ts);
         BigInteger exp = now.add(_years.multiply(ONE_YEAR));
         expirations.set(_id, exp);
-        nameMap.set(_name, _owner);
-        nameId.set(_id, _name);
+        String sanitizedName = sanitizeName(_name);
+        nameMap.set(sanitizedName, _owner);
+        nameId.set(_id, sanitizedName);
         ownership.set(_id, _owner);
         var tokens = userBalance.get(_owner);
         if (tokens == null) {
@@ -397,7 +410,7 @@ public class IRC31 implements InterfaceIRC31 {
         crossChainBalance.set(_id, returnBtpAddress(iconId, _owner.toString()));
         nameCount.set(_id);
         TransferSingle(_owner, ZERO_ADDRESS, _owner, _id, BigInteger.ONE);
-        ExpirationSet(_id, _name, exp);
+        ExpirationSet(_id, sanitizedName, exp);
     }
 
     @Payable
@@ -483,6 +496,18 @@ public class IRC31 implements InterfaceIRC31 {
         _burnInternal(_owner, _id, _amount);
         ownership.set(_id, ZERO_ADDRESS);
         TransferSingle(_owner, _owner, ZERO_ADDRESS, _id, _amount);
+    }
+
+    @External
+    public void withdrawFunds(Address _recipient) {
+        this.ownerRequired();
+        Context.transfer(_recipient, Context.getBalance(Context.getAddress()));
+    }
+
+    @External
+    public void adminSetOwn(Address _recipient, BigInteger _id) {
+        this.ownerRequired();
+        ownership.set(_id, _recipient);
     }
 
     @External
