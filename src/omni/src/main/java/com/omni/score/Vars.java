@@ -28,6 +28,7 @@ public class Vars {
     static final DictDB<BigInteger, Address> ownership = Context.newDictDB(OWNERSHIP, Address.class);
     static final DictDB<BigInteger, BigInteger> expirations = Context.newDictDB(EXPIRATIONS, BigInteger.class);
     static final ArrayDB<BigInteger> prices = newArrayDB(PRICES, BigInteger.class);
+    static final DictDB<Address, BigInteger> airdrop = Context.newDictDB(AIRDROP, BigInteger.class);
 
     // Cross-chain logic
     static final ArrayDB<String> supportedNetworks = Context.newArrayDB(SUPPORTED_NETWORKS, String.class);
@@ -35,5 +36,4 @@ public class Vars {
     static final DictDB<BigInteger, String> crossChainBalance = Context.newDictDB(CROSS_CHAIN_BALANCE, String.class);
     static final VarDB<String> btpAddress = newVarDB(BTP, String.class);
     static final DictDB<String, String> servicesContracts = Context.newDictDB(SERVICE_CONTRACTS, String.class);
-
 }

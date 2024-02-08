@@ -23,10 +23,9 @@ import static com.omni.score.Constant.*;
 import static com.omni.score.Message.*;
 import static com.omni.score.xCalls.*;
 
-public class IRC31 implements InterfaceIRC31 {
+public class IRC31 extends xCalls implements InterfaceIRC31 {
 
     public IRC31(String _name, String _symbol) {
-
         if (name.get() == null) {
             name.set(ensureNotEmpty(_name));
             symbol.set(ensureNotEmpty(_symbol));
@@ -42,6 +41,11 @@ public class IRC31 implements InterfaceIRC31 {
                 supportedNetworks.add(network);
             }
         }
+    }
+    
+    @Payable
+    public void fallback() {
+        // just receive incoming funds
     }
 
     private String ensureNotEmpty(String str) {
@@ -60,7 +64,6 @@ public class IRC31 implements InterfaceIRC31 {
         if (lastSlashIndex != -1 && lastSlashIndex < btpAddress.length() - 1) {
             return Address.fromString(btpAddress.substring(lastSlashIndex + 1));
         } else {
-            // Return an empty string or handle the case as needed
             return Address.fromString("hx0000000000000000000000000000000000000000");
         }
     }
@@ -86,6 +89,11 @@ public class IRC31 implements InterfaceIRC31 {
     }
 
     @External(readonly = true)
+    public BigInteger isAirdropEligible(Address _address) {
+        return airdrop.getOrDefault(_address, BigInteger.ZERO);
+    }
+
+    @External(readonly = true)
     public Address getAdmin() {
         return admin.get();
     }
@@ -103,6 +111,11 @@ public class IRC31 implements InterfaceIRC31 {
     @External(readonly = true)
     public String nameOf(BigInteger _id) {
         return nameId.get(_id);
+    }
+
+    @External(readonly = true)
+    public String supportedNetworks(int index) {
+        return supportedNetworks.get(index);
     }
 
 
@@ -132,6 +145,12 @@ public class IRC31 implements InterfaceIRC31 {
         return mainName.get(_btpAddress);
     }
 
+    @External(readonly = true)
+    public String getCurrentChainMainName(Address _address) {
+        String iconId = supportedNetworks.get(0);
+        return mainName.get(returnBtpAddress(iconId, _address.toString()));
+    }
+
     @External
     public void setAdmin(Address adminAddress) {
         this.ownerRequired();
@@ -142,6 +161,26 @@ public class IRC31 implements InterfaceIRC31 {
     public void setPrice(BigInteger price, int index) {
         this.ownerRequired();
         prices.set(index,price);
+    }
+
+    @External
+    public void setAirdropAllocation(Address[] _users) {
+        this.ownerRequired();
+        for (int i = 0; i < _users.length; i++) {
+            airdrop.set(_users[i],BigInteger.ONE);
+        }
+    }
+
+    @External
+    public void claimAirdrop(String _name) {
+        BigInteger allocation = airdrop.get(Context.getCaller());
+        Context.require(allocation.compareTo(BigInteger.ZERO) > 0, "Not eligible for airdrop");
+        int nameLength = _name.length();
+        Context.require(nameLength > 0, "Incorect name length.");
+        Context.require(nameMap.get(_name) == null, "Name taken");
+        String uri = generateSvg(_name);
+        _registerName(Context.getCaller(), uri, _name, BigInteger.ONE);
+        airdrop.set(Context.getCaller(), allocation.subtract(BigInteger.ONE));
     }
 
     @External(readonly=true)
@@ -505,12 +544,6 @@ public class IRC31 implements InterfaceIRC31 {
     }
 
     @External
-    public void adminSetOwn(Address _recipient, BigInteger _id) {
-        this.ownerRequired();
-        ownership.set(_id, _recipient);
-    }
-
-    @External
     public void burnBatch(Address _owner, BigInteger[] _ids, BigInteger[] _amounts) {
         Context.require(_ids.length == _amounts.length, Message.Not.sameSize("_ids","_amounts"));
 
@@ -564,6 +597,12 @@ public class IRC31 implements InterfaceIRC31 {
     private void adminRequired() {
         Context.require(Context.getCaller().equals(this.getAdmin()) || Context.getCaller().equals(Context.getOwner()),
                 Message.Not.admin());
+    }
+
+    @External
+    public void setSupportedNetworks(int _index, String _network) {
+        this.adminRequired();
+        supportedNetworks.set(_index, _network);
     }
 
     private void preBurnConditions(Address address, BigInteger id, BigInteger amount) {

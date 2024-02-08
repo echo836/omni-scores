@@ -14,7 +14,6 @@ import score.annotation.External;
 import score.annotation.Optional;
 import score.annotation.Payable;
 
-
 public class xCalls {
 
     @External(readonly=true)
@@ -51,17 +50,22 @@ public class xCalls {
         btpAddress.set(_address);
     }
 
+    @External
+    public void setServicesContracts(String _chain, String _address) {
+        ownerRequired();
+        servicesContracts.set(_chain, _address);
+    }
+
     private String isolateChain(String _chain) {
-        int startIndex = _chain.indexOf("//") + 2; // Adding 2 to exclude "//"
-        int endIndex = _chain.indexOf(".", startIndex);
+        int startIndex = _chain.lastIndexOf("//") + 2;
+        int endIndex = _chain.lastIndexOf(".", startIndex);
         
         if (startIndex >= 0 && endIndex > startIndex) {
             return _chain.substring(startIndex, endIndex);
         } else {
-            return null; // Return null if no valid substring found
+            return null;
         }
     }
-
 
     private BigInteger _sendCallMessage(BigInteger value, String to, byte[] data, byte[] rollback) {
         try {
@@ -88,6 +92,7 @@ public class xCalls {
     }
 
     private BigInteger _mintAndLockNft(BigInteger _years, String _name, String _from, String _uri) {
+        LOG("passed",_name, _from, _uri );
         int nameLength = _name.length();
         Context.require(nameLength > 0, "Incorect name length.");
         Context.require(_years.signum() > 0 && _years.compareTo(BigInteger.valueOf(4)) <= 0 , "Incorect duration.");
@@ -108,6 +113,29 @@ public class xCalls {
         }
         // Convert name to lowercase
         return _name.toLowerCase();
+    }
+
+    public static String[] splitByComma(String input) {
+        int count = 0;
+        for (int i = 0; i < input.length(); i++) {
+            if (input.charAt(i) == ',') {
+                count++;
+            }
+        }
+        String[] parts = new String[count + 1];
+        int lastIndex = -1;
+        int partIndex = 0;
+        for (int i = 0; i <= count; i++) {
+            int nextIndex = input.indexOf(',', lastIndex + 1);
+            if (nextIndex == -1) {
+                parts[partIndex] = input.substring(lastIndex + 1);
+            } else {
+                parts[partIndex] = input.substring(lastIndex + 1, nextIndex);
+            }
+            lastIndex = nextIndex;
+            partIndex++;
+        }
+        return parts;
     }
 
     private void _registerNameAndLock(BigInteger _id, String _owner, String _uri, String _name, BigInteger _years){
@@ -132,25 +160,20 @@ public class xCalls {
         onlyCallService();
         MessageReceived(_from, _data);
         // Get the destination chain
-        String _chain = isolateChain(_from);
-        // Get the expected caller
+        // String _chain = isolateChain(_from);
+        String _chain = "bsc"; // TODO fix that
+        String _chainId = "0x61"; // TODO fix that
         String expectedCaller = getServiceContractAt(_chain); 
+
         if (btpAddress().equals(_from)) { // rollback
             String message = new String(_data);
-            String[] parts = message.split(",");
-            if (parts.length == 3) {
-                String method = parts[0];
-                if (method == "mint"){
-                    // cancel mint if rollbacked
-                }
-            } else {
-                Context.revert(0, "Invalid rollback");
-            }
+            String[] parts =  splitByComma(message);
         } else if (expectedCaller.equals(_from)) {
             String message = new String(_data);
-            String[] parts = message.split(",");
+            String[] parts = splitByComma(message);
             String method = parts[0];
-            if (method == "mint"){
+            LOG(method, parts[1], parts[2], parts[3]);
+            if (method.length() > 0){
                 String name = parts[1];
                 String owner = parts[2];
                 BigInteger year = new BigInteger(parts[3]);
@@ -159,12 +182,12 @@ public class xCalls {
                 BigInteger _id = _mintAndLockNft(year, name, owner, _uri);
                 byte[] _mintMessage = ("mint,"+_id.toString()+','+owner+','+_uri).getBytes();
                 byte[] _rollbackMessage = ("mint,"+_id.toString()).getBytes();
-                _sendCallMessage(BigInteger.ZERO, expectedCaller, _mintMessage, _rollbackMessage);
+                // Get fees 
+                BigInteger fees = (BigInteger) Context.call(extractAddressFromBtpAddress(btpAddress()), "getFee", _chainId+"."+_chain, true);
+                _sendCallMessage(fees, expectedCaller, _mintMessage, _rollbackMessage);
             }
             // TODO: Handle renew, claim
         }
-        
-
     }
 
 
@@ -179,4 +202,7 @@ public class xCalls {
 
     @EventLog(indexed=1)
     public void URI(BigInteger _id, String _value) {}
+
+    @EventLog(indexed=1)
+    public void LOG(String a, String b, String c, String d) {}
 }

@@ -24,6 +24,7 @@ public class Constant {
     static final String USER_BALANCE = "user_balance";
     static final String CROSS_CHAIN_BALANCE="cross_chain_balance";
     static final String SERVICE_CONTRACTS="service_contracts";
+    static final String AIRDROP="airdrop";
 
     static final BigInteger ONE_YEAR = BigInteger.valueOf(3_154_000_000_000_0L);
     static final BigInteger GRACE = BigInteger.valueOf(7_776_000_000_000L);

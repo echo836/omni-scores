@@ -25,6 +25,7 @@ deployJar {
         berlin {
             uri = 'https://berlin.net.solidwallet.io/api/v3'
             nid = 0x7
+            to = 'cx522cd1a6d55fbb54e384f24c32cb396141d40600'
         }
         sejong {
             uri = 'https://sejong.net.solidwallet.io/api/v3'
